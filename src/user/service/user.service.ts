@@ -8,6 +8,19 @@ import { UserRole } from '../../commons/enums';
 @Injectable()
 export class UserService {
     private readonly users: User[] = [];
+
+    findAll(): User[] {
+        return this.users;
+    }
+
+    findOne(id: string): User {
+        const user = this.users.find(u => u.id === id);
+        if (!user) {
+            throw new NotFoundException(`User with id ${id} not found`); // Throw 404 if user not found
+        }
+        return user;
+    }
+
     create(dto: CreateUserDto){
         const now = Date.now();
         const newuser: User = {

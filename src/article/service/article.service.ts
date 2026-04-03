@@ -89,11 +89,19 @@ export class ArticleService {
     }
     
     nullifyAuthor(userId: string): void {
-    this.articles.forEach(a => { if (a.authorId === userId) a.authorId = null; });
+    this.articles.forEach(a => { 
+        if (a.authorId === userId){
+            a.authorId = null; 
+        }
+    });
   }
  
   nullifyCategory(categoryId: string): void {
-    this.articles.forEach(a => { if (a.categoryId === categoryId) a.categoryId = null; });
+    this.articles.forEach(a => { 
+        if (a.categoryId === categoryId){
+            a.categoryId = null; 
+        }
+    });
   }
  
   articleExists(id: string): boolean {

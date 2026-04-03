@@ -14,20 +14,28 @@ export function paginate<T>(
 }
 
 export function sortItems<T>(
-  items  : T[],
+  items: T[],
   sortBy?: string,
-  order  : 'asc' | 'desc' = 'asc',
+  order: 'asc' | 'desc' = 'asc',
 ): T[] {
   if (!sortBy) return items;
+
   return [...items].sort((a: any, b: any) => {
-    const aVal = a[sortBy];
-    const bVal = b[sortBy];
-    if (aVal === undefined || bVal === undefined) return 0;
-    if (typeof aVal === 'string' && typeof bVal === 'string') {
-      return order === 'asc'
-        ? aVal.localeCompare(bVal)
-        : bVal.localeCompare(aVal);
+    const valueA = a[sortBy];
+    const valueB = b[sortBy];
+
+    if (valueA === undefined || valueB === undefined) return 0;
+
+    if (typeof valueA === 'string' && typeof valueB === 'string') {
+      if (order === 'asc') {
+        return valueA.localeCompare(valueB);
+      }
+      return valueB.localeCompare(valueA);
     }
-    return order === 'asc' ? aVal - bVal : bVal - aVal;
+
+    if (order === 'asc'){
+        return valueA - valueB;
+    }
+    return valueB - valueA;
   });
 }

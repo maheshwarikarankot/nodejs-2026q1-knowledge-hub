@@ -4,10 +4,17 @@ import { UpdatePasswordDto } from '../dto/update-password.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { randomUUID } from 'node:crypto';
 import { UserRole } from '../../commons/enums';
+import { ArticleService } from '../../article/service/article.service';
+import { CommentService } from '../../comment/service/comment.service';
 
 @Injectable()
 export class UserService {
     private readonly users: User[] = [];
+
+    constructor(
+        private readonly articleService: ArticleService,
+        private readonly commentService: CommentService,
+    ) {}
 
     findAll(): User[] {
         return this.users;
@@ -53,6 +60,10 @@ export class UserService {
         if (index === -1) {
             throw new NotFoundException(`User with id ${id} not found`); // Throw 404 if user not found
         }
+
+        this.articleService.nullifyAuthor(id);
+        this.commentService.removeByAuthor(id);
+
         this.users.splice(index, 1);
     }   
 

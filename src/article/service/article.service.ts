@@ -1,15 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { CreateArticleDto } from '../dto/create-article.dto';
 import { randomUUID } from 'node:crypto';
 import { ArticleStatus } from '../../commons/enums';
 import { Article } from '../../commons/interfaces';
 import { PaginatedResponse } from '../../commons/pagination/pagination.interface';
 import { paginate, sortItems } from '../../commons/pagination/pagination.function';
+import { CommentService } from '../../comment/service/comment.service';
 
 
 @Injectable()
 export class ArticleService {
     private readonly articles = [];
+
+    constructor(
+        @Inject(forwardRef(() => CommentService))
+        private readonly commentService: CommentService,
+    ) {}
 
     findAll(filters?: { 
         status?: ArticleStatus;
@@ -81,30 +87,34 @@ export class ArticleService {
     }
 
     remove(id: string): void{
-        const index = this.articles.findIndex(a => a.id === id);
+    const index = this.articles.findIndex(a => a.id === id);
         if (index === -1) {
             throw new NotFoundException(`Article with id ${id} not found`);
         }
+
+        this.commentService.removeByArticle(id);
+
         this.articles.splice(index, 1);
     }
     
     nullifyAuthor(userId: string): void {
-    this.articles.forEach(a => { 
-        if (a.authorId === userId){
+        this.articles.forEach(a => { 
+            if (a.authorId === userId){
             a.authorId = null; 
-        }
-    });
-  }
+            }
+        });
+    }
  
-  nullifyCategory(categoryId: string): void {
-    this.articles.forEach(a => { 
-        if (a.categoryId === categoryId){
+    nullifyCategory(categoryId: string): void {
+        this.articles.forEach(a => { 
+         if (a.categoryId === categoryId){
             a.categoryId = null; 
-        }
-    });
-  }
+            }
+        });
+    }
  
-  articleExists(id: string): boolean {
-    return this.articles.some(a => a.id === id);
-  }
+    articleExists(id: string): boolean {
+        const article = this.articles.find((existingArticle) => existingArticle.id === id);
+        return article !== undefined;
+    }
 }

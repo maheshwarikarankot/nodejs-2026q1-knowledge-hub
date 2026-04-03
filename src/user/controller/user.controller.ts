@@ -17,21 +17,25 @@ export class UserController {
     }
 
     @Get()
+    @HttpCode(200)
     findAll(): User[] {
         return this.userService.findAll();
     }
 
     @Get(':id')
+    @HttpCode(200)
     findOne(@Param('id', ParseUUIDPipe) id: string){
         return this.userService.findOne(id);
     }
 
     @Put(':id')
+    @HttpCode(200)
     updatePassword(@Param('id', ParseUUIDPipe) id: string, @Body() updatePasswordDto: UpdatePasswordDto){
         return this.userService.updatePassword(id, updatePasswordDto);
     }
 
     @Delete(':id')
+    @HttpCode(204)
     delete(@Param('id', ParseUUIDPipe) id: string){
         return this.userService.delete(id);
     }

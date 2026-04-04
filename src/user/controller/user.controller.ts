@@ -3,7 +3,12 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { UserService } from '../service/user.service';
 import { UpdatePasswordDto } from '../dto/update-password.dto';
 import { User } from '../../commons/interfaces';
+import { ApiTags } from '@nestjs/swagger/dist/decorators/api-use-tags.decorator';
+import { ApiResponse } from '@nestjs/swagger/dist/decorators/api-response.decorator';
+import { ApiQuery } from '@nestjs/swagger/dist/decorators/api-query.decorator';
+import { ApiOperation } from '@nestjs/swagger/dist/decorators/api-operation.decorator';
 
+@ApiTags('Users')
 @Controller('user')
 export class UserController {
 
@@ -11,6 +16,9 @@ export class UserController {
 
 
     @Post()
+    @ApiOperation({ summary: 'Create user' })
+    @ApiResponse({ status: 201 })
+    @ApiResponse({ status: 400, description: 'Validation error' })
     @HttpCode(201)
     create(@Body() userDto: CreateUserDto){
         return this.userService.create(userDto);
@@ -23,20 +31,31 @@ export class UserController {
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Get user by id' })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'User not found' })
     @HttpCode(200)
     findOne(@Param('id', ParseUUIDPipe) id: string){
         return this.userService.findOne(id);
     }
 
     @Put(':id')
+    @ApiOperation({ summary: 'Update user password' })
+    @ApiResponse({ status: 200, description: 'Password updated successfully' })
+    @ApiResponse({ status: 403, description: 'Wrong old password' })
+    @ApiResponse({ status: 404, description: 'User not found' })
     @HttpCode(200)
     updatePassword(@Param('id', ParseUUIDPipe) id: string, @Body() updatePasswordDto: UpdatePasswordDto){
         return this.userService.updatePassword(id, updatePasswordDto);
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Delete user' })
+    @ApiResponse({ status: 204, description: 'User deleted successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'User not found' })
     @HttpCode(204)
-    delete(@Param('id', ParseUUIDPipe) id: string){
-        return this.userService.delete(id);
+    remove(@Param('id', ParseUUIDPipe) id: string){
+        return this.userService.remove(id);
     }
 }

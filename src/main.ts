@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common/pipes/validation.pipe';
+import { SwaggerModule } from '@nestjs/swagger/dist/swagger-module';
+import { DocumentBuilder } from '@nestjs/swagger/dist/document-builder';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,6 +13,17 @@ async function bootstrap() {
     forbidNonWhitelisted : false,
     transform            : true,  // auto-transform types
   }));
+  
+  const config = new DocumentBuilder()
+    .setTitle('Knowledge Hub API')
+    .setDescription('REST API for the Knowledge Hub platform')
+    .setVersion('1.0')
+    .build();
+ 
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('doc', app, document);
+  
+  
   const PORT = process.env.PORT ?? 3000;
   await app.listen(PORT);
   console.log(`Application is running on: http://localhost:${PORT}`);

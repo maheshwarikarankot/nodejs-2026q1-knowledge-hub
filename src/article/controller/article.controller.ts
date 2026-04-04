@@ -1,20 +1,34 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import { ArticleService } from '../service/article.service';
-import { CreateArticleDto } from '../dto/update-article.dto';
+import { UpdateArticleDto } from '../dto/update-article.dto';
+import { CreateArticleDto } from '../dto/create-article.dto';
 import { Article } from '../../commons/interfaces';
 import { ArticleStatus } from '../../commons/enums';
+import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('Articles')
 @Controller('article')
 export class ArticleController {
     constructor(private readonly articleService: ArticleService) {}
 
     @Post()
+    @ApiOperation({ summary: 'Create article' })
+    @ApiResponse({ status: 201 })
+    @ApiResponse({ status: 400, description: 'Validation error' })
     @HttpCode(201)
     create(@Body() articleDto: CreateArticleDto) {
         return this.articleService.create(articleDto);
     }   
 
     @Get()
+    @ApiOperation({ summary: 'Get all articles' })
+    @ApiQuery({ name: 'status',     required: false, enum: ArticleStatus })
+    @ApiQuery({ name: 'categoryId', required: false })
+    @ApiQuery({ name: 'tag',        required: false })
+    @ApiQuery({ name: 'page',       required: false, example: 1  })
+    @ApiQuery({ name: 'limit',      required: false, example: 10 })
+    @ApiQuery({ name: 'sortBy',     required: false, example: 'createdAt' })
+    @ApiQuery({ name: 'order',      required: false, enum: ['asc', 'desc'] })
     @HttpCode(200)
     findAll(
         @Query('status') status? : ArticleStatus,
@@ -37,18 +51,30 @@ export class ArticleController {
     }
 
     @Get(':id')
+    @ApiOperation({ summary: 'Get article by id' })
+    @ApiResponse({ status: 200 })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'Article not found' })
     @HttpCode(200)
     findOne(@Param('id', ParseUUIDPipe) id: string): Article {
         return this.articleService.findOne(id);
     }
 
     @Put(':id')
+    @ApiOperation({ summary: 'Update article' })
+    @ApiResponse({ status: 200, description: 'Article updated successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'Article not found' })
     @HttpCode(200)
-    update(@Param('id', ParseUUIDPipe) id: string, @Body() articleDto: CreateArticleDto): Article {
+    update(@Param('id', ParseUUIDPipe) id: string, @Body() articleDto: UpdateArticleDto): Article {
         return this.articleService.update(id, articleDto);
     }
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Delete article' })
+    @ApiResponse({ status: 204, description: 'Article deleted successfully' })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'Article not found' })
     @HttpCode(204)
     remove(@Param('id', ParseUUIDPipe) id: string) {
         return this.articleService.remove(id);

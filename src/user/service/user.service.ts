@@ -11,6 +11,11 @@ import { CommentService } from '../../comment/service/comment.service';
 export class UserService {
     private readonly users: User[] = [];
 
+    private sanitize(user: User): Omit<User, 'password'> {
+    const { password, ...rest } = user;
+    return rest;
+  }
+
     constructor(
         private readonly articleService: ArticleService,
         private readonly commentService: CommentService,
@@ -20,15 +25,15 @@ export class UserService {
         return this.users;
     }
 
-    findOne(id: string): User {
+    findOne(id: string): Omit<User, 'password'> {
         const user = this.users.find(u => u.id === id);
         if (!user) {
             throw new NotFoundException(`User with id ${id} not found`); // Throw 404 if user not found
         }
-        return user;
+        return this.sanitize(user);
     }
 
-    create(dto: CreateUserDto){
+    create(dto: CreateUserDto): Omit<User, 'password'> {
         const now = Date.now();
         const newuser: User = {
             id: randomUUID(),
@@ -39,10 +44,10 @@ export class UserService {
             updatedAt: now
         };
         this.users.push(newuser);
-        return newuser;
+        return this.sanitize(newuser);
     }
 
-    updatePassword(id: string, dto: UpdatePasswordDto): User {
+    updatePassword(id: string, dto: UpdatePasswordDto): Omit<User, 'password'> {
         const user = this.users.find(u => u.id === id);
         if (!user) {
             throw new NotFoundException(`User with id ${id} not found`); // Throw 404 if user not found
@@ -52,10 +57,10 @@ export class UserService {
         }
         user.password = dto.newPassword;
         user.updatedAt = Date.now();
-        return user;
+        return this.sanitize(user);
     }
 
-    delete(id: string): void {
+    remove(id: string): void {
         const index = this.users.findIndex(u => u.id === id);
         if (index === -1) {
             throw new NotFoundException(`User with id ${id} not found`); // Throw 404 if user not found
@@ -65,6 +70,8 @@ export class UserService {
         this.commentService.removeByAuthor(id);
 
         this.users.splice(index, 1);
-    }   
+    }
+    
+    nullifyAuthor(userId: string): void {}
 
 }

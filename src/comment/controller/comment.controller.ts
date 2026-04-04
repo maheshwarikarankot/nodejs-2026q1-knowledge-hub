@@ -1,18 +1,32 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { CommentService } from '../service/comment.service';
 import { CreateCommentDto } from '../dto/create-comment.dto';
+import { ApiTags } from '@nestjs/swagger/dist/decorators/api-use-tags.decorator';
+import { ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('Comments')
 @Controller('comment')
 export class CommentController {
     constructor(private readonly commentService: CommentService) {}
 
     @Post()
+    @ApiOperation({ summary: 'Create comment' })
+    @ApiResponse({ status: 201, description: 'Comment created successfully' })
+    @ApiResponse({ status: 400, description: 'Validation error' })
+    @ApiResponse({ status: 422, description: 'Article not found' })
     @HttpCode(201)
     create(@Body() commentDto: CreateCommentDto) {
         return this.commentService.create(commentDto);
     }
 
     @Get()
+    @ApiOperation({ summary: 'Get all comments for an article' })
+    @ApiQuery({ name: 'articleId', required: true  })
+    @ApiQuery({ name: 'page',      required: false, example: 1  })
+    @ApiQuery({ name: 'limit',     required: false, example: 10 })
+    @ApiQuery({ name: 'sortBy',    required: false, example: 'createdAt' })
+    @ApiQuery({ name: 'order',     required: false, enum: ['asc', 'desc'] })
+    @ApiResponse({ status: 400, description: 'articleId is required' })
     @HttpCode(200)
     findAll(
         @Query('articleId') articleId? : string,
@@ -34,6 +48,10 @@ export class CommentController {
     }   
 
     @Delete(':id')
+    @ApiOperation({ summary: 'Delete comment' })
+    @ApiResponse({ status: 204 })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'Comment not found' })
     @HttpCode(204)
     remove(@Param('id', ParseUUIDPipe) id: string) {
         return this.commentService.remove(id);

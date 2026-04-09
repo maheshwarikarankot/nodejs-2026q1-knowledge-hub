@@ -11,8 +11,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "jest --config ./test/jest-e2e.json",
+    "test:watch": "jest --watch --testRegex \"src/.*\\\\.spec\\\\.ts$\"",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
@@ -23,7 +23,7 @@
       "ts"
     ],
     "rootDir": ".",
-    "testRegex": ".*\\.spec\\.ts$",
+    "testRegex": "src/.*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
@@ -64,9 +64,13 @@
     "@nestjs/core": "^11.1.17",
     "@nestjs/platform-express": "^11.0.2",
     "@nestjs/swagger": "^11.2.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "http-status-codes": "^2.3.0",
+    "jsonwebtoken": "^9.0.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "uuid": "^13.0.0"
   }
 }

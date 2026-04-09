@@ -1,106 +1,309 @@
-import { Test, TestingModule }    from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request               from 'supertest';
-import { AppModule }              from '../src/app.module';
+import { isUUID as validate } from 'class-validator';
+import { StatusCodes } from 'http-status-codes';
+import { request } from './lib';
+import {
+  getTokenAndUserId,
+  shouldAuthorizationBeTested,
+  removeTokenUser,
+} from './utils';
+import { commentsRoutes, articlesRoutes } from './endpoints';
 
-describe('CommentController (e2e)', () => {
-  let app        : INestApplication;
-  let articleId  : string;
-  let commentId  : string;
+// Probability of collisions for UUID is almost zero
+const randomUUID = '0a35dd62-e09f-444b-a628-f4e7c6954f57';
+
+describe('Comments (e2e)', () => {
+  const unauthorizedRequest = request;
+  const commonHeaders = { Accept: 'application/json' };
+  let mockUserId: string | undefined;
+  let testArticleId: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
+    if (shouldAuthorizationBeTested) {
+      const result = await getTokenAndUserId(unauthorizedRequest);
+      commonHeaders['Authorization'] = result.token;
+      mockUserId = result.mockUserId;
+    }
 
-    // Pre-create an article
-    const artRes = await request(app.getHttpServer())
-      .post('/article')
-      .send({ title: 'Understanding Node.js Streams and Buffers',
-        content: 'Streams allow you to process data chunk by chunk without loading the entire file into memory. This article explains readable, writable, transform, and duplex streams with practical examples using the fs and stream modules.' });
-    articleId = artRes.body.id;
-  });
-
-  afterAll(async () => { await app.close(); });
-
-  // Scenario 1: GET without articleId → 400
-  it('GET /comment without articleId → 400', async () => {
-    const res = await request(app.getHttpServer()).get('/comment');
-    expect(res.status).toBe(400);
-  });
-
-  // Scenario 2: POST create comment → 201
-  it('POST /comment → 201', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/comment')
-      .send({ content: 'Great article!', articleId });
-    expect(res.status).toBe(201);
-    expect(res.body.content).toBe('Great article!');
-    expect(res.body.articleId).toBe(articleId);
-    commentId = res.body.id;
-  });
-
-  // Scenario 3: POST non-existing articleId → 422
-  it('POST /comment with invalid articleId → 422', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/comment')
+    // Create a test article for comments
+    const createArticleResponse = await unauthorizedRequest
+      .post(articlesRoutes.create)
+      .set(commonHeaders)
       .send({
-        content  : 'Great article!',
-        articleId: '550e8400-e29b-41d4-a716-446655440000',
+        title: 'TEST_ARTICLE_FOR_COMMENTS',
+        content: 'Test content',
+        status: 'draft',
+        authorId: null,
+        categoryId: null,
+        tags: [],
       });
-    expect(res.status).toBe(422);
+
+    expect(createArticleResponse.status).toBe(StatusCodes.CREATED);
+    testArticleId = createArticleResponse.body.id;
   });
 
-  // Scenario 4: POST missing fields → 400
-  it('POST /comment missing content → 400', async () => {
-    const res = await request(app.getHttpServer())
-      .post('/comment')
-      .send({ articleId });
-    expect(res.status).toBe(400);
+  afterAll(async () => {
+    // Cleanup test article
+    if (testArticleId) {
+      await unauthorizedRequest
+        .delete(articlesRoutes.delete(testArticleId))
+        .set(commonHeaders);
+    }
+
+    if (mockUserId) {
+      await removeTokenUser(unauthorizedRequest, mockUserId, commonHeaders);
+    }
+
+    if (commonHeaders['Authorization']) {
+      delete commonHeaders['Authorization'];
+    }
   });
 
-  // Scenario 5: GET comments for article → 200 paginated
-  it(`GET /comment?articleId → 200 paginated`, async () => {
-    const res = await request(app.getHttpServer())
-      .get(`/comment?articleId=${articleId}`);
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('data');
-    expect(res.body.data.length).toBeGreaterThan(0);
+  describe('GET', () => {
+    it('should correctly get comments by articleId', async () => {
+      const response = await unauthorizedRequest
+        .get(commentsRoutes.getByArticle(testArticleId))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.OK);
+      expect(response.body).toBeInstanceOf(Object);
+      expect(response.body.data).toBeInstanceOf(Array);
+    });
+
+    it('should correctly get comment by id', async () => {
+      const createCommentDto = {
+        content: 'Test comment for GET',
+        articleId: testArticleId,
+        authorId: null,
+      };
+
+      const creationResponse = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send(createCommentDto);
+
+      const { id } = creationResponse.body;
+
+      expect(creationResponse.statusCode).toBe(StatusCodes.CREATED);
+
+      const searchResponse = await unauthorizedRequest
+        .get(commentsRoutes.getById(id))
+        .set(commonHeaders);
+
+      expect(searchResponse.statusCode).toBe(StatusCodes.OK);
+      expect(searchResponse.body).toBeInstanceOf(Object);
+
+      const cleanupResponse = await unauthorizedRequest
+        .delete(commentsRoutes.delete(id))
+        .set(commonHeaders);
+
+      expect(cleanupResponse.statusCode).toBe(StatusCodes.NO_CONTENT);
+    });
+
+    it('should respond with BAD_REQUEST status code in case of invalid id', async () => {
+      const response = await unauthorizedRequest
+        .get(commentsRoutes.getById('some-invalid-id'))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.BAD_REQUEST);
+    });
+
+    it("should respond with NOT_FOUND status code in case if comment doesn't exist", async () => {
+      const response = await unauthorizedRequest
+        .get(commentsRoutes.getById(randomUUID))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.NOT_FOUND);
+    });
+
+    it('should return only comments for the specified article', async () => {
+      // Create another article
+      const anotherArticleResponse = await unauthorizedRequest
+        .post(articlesRoutes.create)
+        .set(commonHeaders)
+        .send({
+          title: 'ANOTHER_ARTICLE',
+          content: 'Another content',
+          status: 'draft',
+          authorId: null,
+          categoryId: null,
+          tags: [],
+        });
+
+      expect(anotherArticleResponse.status).toBe(StatusCodes.CREATED);
+      const { id: anotherArticleId } = anotherArticleResponse.body;
+
+      // Create comment on test article
+      const comment1Response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send({
+          content: 'Comment on first article',
+          articleId: testArticleId,
+          authorId: null,
+        });
+
+      expect(comment1Response.status).toBe(StatusCodes.CREATED);
+      const { id: comment1Id } = comment1Response.body;
+
+      // Create comment on another article
+      const comment2Response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send({
+          content: 'Comment on second article',
+          articleId: anotherArticleId,
+          authorId: null,
+        });
+
+      expect(comment2Response.status).toBe(StatusCodes.CREATED);
+      const { id: comment2Id } = comment2Response.body;
+
+      // Get comments for test article only
+      const response = await unauthorizedRequest
+        .get(commentsRoutes.getByArticle(testArticleId))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.OK);
+      expect(response.body.data).toBeInstanceOf(Array);
+
+      const hasComment1 = response.body.data.some((c) => c.id === comment1Id);
+      const hasComment2 = response.body.data.some((c) => c.id === comment2Id);
+
+      expect(hasComment1).toBe(true);
+      expect(hasComment2).toBe(false);
+
+      // Cleanup
+      await unauthorizedRequest.delete(commentsRoutes.delete(comment1Id)).set(commonHeaders);
+      await unauthorizedRequest.delete(commentsRoutes.delete(comment2Id)).set(commonHeaders);
+      await unauthorizedRequest.delete(articlesRoutes.delete(anotherArticleId)).set(commonHeaders);
+    });
   });
 
-  // Scenario 6: DELETE comment → 204
-  it('DELETE /comment/:id → 204', async () => {
-    const res = await request(app.getHttpServer()).delete(`/comment/${commentId}`);
-    expect(res.status).toBe(204);
+  describe('POST', () => {
+    it('should correctly create comment', async () => {
+      const createCommentDto = {
+        content: 'Test comment',
+        articleId: testArticleId,
+        authorId: null,
+      };
+
+      const response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send(createCommentDto);
+
+      expect(response.status).toBe(StatusCodes.CREATED);
+
+      const { id, content, articleId, authorId, createdAt } = response.body;
+      expect(validate(id)).toBe(true);
+      expect(content).toBe(createCommentDto.content);
+      expect(articleId).toBe(createCommentDto.articleId);
+      expect(authorId).toBe(createCommentDto.authorId);
+      expect(typeof createdAt).toBe('number');
+
+      const cleanupResponse = await unauthorizedRequest
+        .delete(commentsRoutes.delete(id))
+        .set(commonHeaders);
+
+      expect(cleanupResponse.statusCode).toBe(StatusCodes.NO_CONTENT);
+    });
+
+    it('should respond with BAD_REQUEST in case of invalid required data', async () => {
+      const payloads = [
+        {},
+        { content: 'Test comment' },
+        { articleId: testArticleId },
+        { content: null, articleId: 12345 },
+      ];
+
+      const responses = [];
+      for (const payload of payloads) {
+        responses.push(
+          await unauthorizedRequest
+            .post(commentsRoutes.create)
+            .set(commonHeaders)
+            .send(payload),
+        );
+      }
+
+      expect(
+        responses.every(
+          ({ statusCode }) => statusCode === StatusCodes.BAD_REQUEST,
+        ),
+      ).toBe(true);
+    });
+
+    it('should respond with UNPROCESSABLE_ENTITY if articleId does not exist', async () => {
+      const response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send({
+          content: 'Test comment',
+          articleId: randomUUID,
+          authorId: null,
+        });
+
+      expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
+    });
+
+    it('should respond with BAD_REQUEST if articleId is invalid UUID', async () => {
+      const response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send({
+          content: 'Test comment',
+          articleId: 'invalid-uuid',
+          authorId: null,
+        });
+
+      expect(response.status).toBe(StatusCodes.BAD_REQUEST);
+    });
   });
 
-  // Scenario 7: GET deleted comment → 404
-  it('DELETE /comment/:id already deleted → 404', async () => {
-    const res = await request(app.getHttpServer()).delete(`/comment/${commentId}`);
-    expect(res.status).toBe(404);
-  });
+  describe('DELETE', () => {
+    it('should correctly delete comment', async () => {
+      const createCommentDto = {
+        content: 'Comment to delete',
+        articleId: testArticleId,
+        authorId: null,
+      };
 
-  // Scenario 8: Cascade — delete article deletes comments
-  it('Cascade: deleting article removes its comments', async () => {
-    // Create article and comment
-    const artRes = await request(app.getHttpServer())
-      .post('/article')
-      .send({ title: 'Great Article', content: 'Content' });
-    const newArticleId = artRes.body.id;
+      const response = await unauthorizedRequest
+        .post(commentsRoutes.create)
+        .set(commonHeaders)
+        .send(createCommentDto);
 
-    const comRes = await request(app.getHttpServer())
-      .post('/comment')
-      .send({ content: 'Great Article', articleId: newArticleId });
-    const newCommentId = comRes.body.id;
+      const { id } = response.body;
 
-    // Delete article
-    await request(app.getHttpServer()).delete(`/article/${newArticleId}`);
+      expect(response.status).toBe(StatusCodes.CREATED);
 
-    // Comment should be gone
-    const delRes = await request(app.getHttpServer()).delete(`/comment/${newCommentId}`);
-    expect(delRes.status).toBe(404);
+      const cleanupResponse = await unauthorizedRequest
+        .delete(commentsRoutes.delete(id))
+        .set(commonHeaders);
+
+      expect(cleanupResponse.statusCode).toBe(StatusCodes.NO_CONTENT);
+
+      const searchResponse = await unauthorizedRequest
+        .get(commentsRoutes.getById(id))
+        .set(commonHeaders);
+
+      expect(searchResponse.statusCode).toBe(StatusCodes.NOT_FOUND);
+    });
+
+    it('should respond with BAD_REQUEST status code in case of invalid id', async () => {
+      const response = await unauthorizedRequest
+        .delete(commentsRoutes.delete('some-invalid-id'))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.BAD_REQUEST);
+    });
+
+    it("should respond with NOT_FOUND status code in case if comment doesn't exist", async () => {
+      const response = await unauthorizedRequest
+        .delete(commentsRoutes.delete(randomUUID))
+        .set(commonHeaders);
+
+      expect(response.status).toBe(StatusCodes.NOT_FOUND);
+    });
   });
 });

@@ -47,6 +47,16 @@ export class CommentController {
         });
     }   
 
+    @Get(':id')
+    @ApiOperation({ summary: 'Get comment by id' })
+    @ApiResponse({ status: 200 })
+    @ApiResponse({ status: 400, description: 'Invalid uuid' })
+    @ApiResponse({ status: 404, description: 'Comment not found' })
+    @HttpCode(200)
+    findOne(@Param('id', ParseUUIDPipe) id: string) {
+        return this.commentService.findOne(id);
+    }
+
     @Delete(':id')
     @ApiOperation({ summary: 'Delete comment' })
     @ApiResponse({ status: 204 })
